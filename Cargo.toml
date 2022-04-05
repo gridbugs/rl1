@@ -7,6 +7,10 @@ edition = "2021"
 version = "0.2"
 features = [
     "chargrid_wgpu",
+    "chargrid_ansi_terminal",
     "chargrid",
     "backend",
 ]
+
+[dependencies]
+meap = "0.5"

@@ -1,6 +1,5 @@
 use gridbugs::{
     chargrid::{control_flow::*, prelude::*},
-    chargrid_wgpu::*,
     direction::CardinalDirection,
     entity_table::Entity,
     rgb_int::Rgb24,
@@ -17,11 +16,60 @@ use spatial::{Layer, Location};
 use visibility::{CellVisibility, EntityTile, VisibilityCell, VisibilityGrid};
 use world::World;
 
-const CELL_SCALE: f64 = 4.;
-const CELL_HEIGHT: f64 = 6. * CELL_SCALE;
-const CELL_WIDTH: f64 = 6. * CELL_SCALE;
+enum Frontend {
+    Wgpu,
+    AnsiTerminal,
+}
+
+impl Frontend {
+    fn parser() -> impl meap::Parser<Item = Self> {
+        meap::choose_at_most_one! {
+            flag("wgpu").some_if(Self::Wgpu),
+            flag("ansi-terminal").some_if(Self::AnsiTerminal),
+        }
+        .with_default_general(Self::Wgpu)
+    }
+}
+
+struct Args {
+    frontend: Frontend,
+}
+
+impl Args {
+    fn parser() -> impl meap::Parser<Item = Self> {
+        meap::let_map! {
+            let {
+                frontend = Frontend::parser();
+            } in {
+                Self { frontend }
+            }
+        }
+    }
+}
 
 fn main() {
+    use meap::Parser;
+    let Args { frontend } = Args::parser().with_help_default().parse_env_or_exit();
+    match frontend {
+        Frontend::Wgpu => main_wgpu(),
+        Frontend::AnsiTerminal => main_ansi_terminal(),
+    }
+}
+
+fn main_ansi_terminal() {
+    use gridbugs::chargrid_ansi_terminal::*;
+
+    let context = Context::new().unwrap();
+    context.run(app(), col_encode::XtermTrueColour);
+}
+
+fn main_wgpu() {
+    use gridbugs::chargrid_wgpu::*;
+
+    const CELL_SCALE: f64 = 4.;
+    const CELL_HEIGHT: f64 = 6. * CELL_SCALE;
+    const CELL_WIDTH: f64 = 6. * CELL_SCALE;
+
     let context = Context::new(Config {
         font_bytes: FontBytes {
             normal: include_bytes!("./fonts/PxPlus_IBM_CGAthin-custom.ttf").to_vec(),
